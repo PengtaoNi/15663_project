@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import cv2
 
 import torch
 from torchvision import transforms
@@ -60,9 +59,7 @@ def subject_mask(image, debug=False):
 
     return out
 
-def face_mask(image_path, debug=False):
-    image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
-
+def face_mask(image, debug=False):
     out = np.where(face_bound(image, debug=debug),
                    subject_mask(image, debug=debug), 0)
     
