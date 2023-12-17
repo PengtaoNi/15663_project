@@ -5,13 +5,13 @@ import torch
 from torchvision import transforms
 from mtcnn import MTCNN
 
-def face_bound(image, debug=False):
+def get_face_bounds(image, debug=False):
     H, W = image.shape[:2]
 
     detector = MTCNN()
     faces = detector.detect_faces(image)
 
-    out = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+    out = []
     for face in faces:
         x, y, w, h = face['box']
 
@@ -21,16 +21,20 @@ def face_bound(image, debug=False):
         y = max(y-h, 0)
         h = min(int(h*2.1), H-y)
 
-        out[y:y+h, x:x+w] = 1
+        mask = np.zeros((H, W), dtype=np.uint8)
+        mask[y:y+h, x:x+w] = 1
+        out.append(mask)
+    
+    out = np.stack(out, axis=0)
 
     if debug:
-        image = np.where(out[:,:,None] == 1, image, image//8)
-        plt.imshow(image)
-        plt.show()
+        for k in range(len(out)):
+            plt.imshow(np.where(out[k][:,:,None] == 1, image, image//8))
+            plt.show()
 
     return out
 
-def subject_mask(image, debug=False):
+def get_subject_mask(image, debug=False):
     H, W = image.shape[:2]
 
     preprocess = transforms.Compose([
@@ -59,13 +63,20 @@ def subject_mask(image, debug=False):
 
     return out
 
-def face_mask(image, debug=False):
-    out = np.where(face_bound(image, debug=debug),
-                   subject_mask(image, debug=debug), 0)
+def get_face_masks(image, debug=False):
+    face_bounds = get_face_bounds(image, debug=debug)
+    subject_mask = get_subject_mask(image, debug=debug)
+
+    out = []
+    for k in range(len(face_bounds)):
+        face_mask = np.where(face_bounds[k], subject_mask, 0) # intersection
+        out.append(face_mask)
+    
+    out = np.stack(out, axis=0)
     
     if debug:
-        image = np.where(out[:,:,None] == 1, image, image//8)
-        plt.imshow(image)
-        plt.show()
+        for k in range(len(out)):
+            plt.imshow(np.where(out[k][:,:,None] == 1, image, image//8))
+            plt.show()
 
     return out
