@@ -29,15 +29,17 @@ def stereographic_projection(image, fov):
     return out
 
 def get_meshes(image, fov, dim=(103, 78), padding=4):
+    h = dim[0] + 2 * padding
+    w = dim[1] + 2 * padding
+
     H, W = image.shape[:2]
+    H = (H-1) * (h-1) / dim[0] + 1
+    W = (W-1) * (w-1) / dim[1] + 1
 
     d = min(H, W)
     # d = np.sqrt(H**2 + W**2)
     fov = np.deg2rad(fov)
     f = d / (2 * np.tan(fov / 2)) # assuming standard rectilinear lens
-
-    h = dim[0] + 2 * padding
-    w = dim[1] + 2 * padding
     
     y, x = np.indices((h, w), dtype=np.float32)
     y = y - (h-1) / 2

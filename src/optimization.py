@@ -26,11 +26,13 @@ class Optimesh(nn.Module):
         E_f = self.face_objective_term()
         E_b, E_r = self.line_bending_and_regularization_term()
         E_a = self.asymmetric_cost_term()
+        penalty = 1e8 * self.boundary_conditions()
 
         energy = self.lbd_f * E_f + \
                  self.lbd_b * E_b + \
-                 self.lbd_r * E_r # + \
-                 # self.lbd_a * E_a
+                 self.lbd_r * E_r + \
+                 self.lbd_a * E_a + \
+                 penalty
 
         return energy
 
@@ -51,7 +53,7 @@ class Optimesh(nn.Module):
 
             energy += (self.face_weights[k] * self.correction_strength * dist).mean() + regularizer
         
-        return energy
+        return energy / len(self.face_weights)
     
     def line_bending_and_regularization_term(self):
         E_b, E_r = 0.0, 0.0
@@ -80,20 +82,37 @@ class Optimesh(nn.Module):
         return E_b, E_r
 
     def asymmetric_cost_term(self):
-        H, W = self.source_mesh[-1,-1] - self.source_mesh[0,0] + 1
+        padding = self.padding
+        H, W = self.source_mesh[-padding-1,-padding-1] - self.source_mesh[padding,padding]
 
-        orig_mesh = self.mesh[self.padding:-self.padding, self.padding:-self.padding]
+        orig_mesh = self.mesh[padding:-padding, padding:-padding]
 
-        vl_x = orig_mesh[ :, 0, 0]
-        vr_x = orig_mesh[ :,-1, 0]
-        vt_y = orig_mesh[ 0, :, 1]
-        vb_y = orig_mesh[-1, :, 1]
+        vl_x = orig_mesh[ :, 0, 1]
+        vr_x = orig_mesh[ :,-1, 1]
+        vt_y = orig_mesh[ 0, :, 0]
+        vb_y = orig_mesh[-1, :, 0]
 
-        E_l = torch.where(vl_x > 0, 1.0, 0.0) * (vl_x)**2
-        E_r = torch.where(vr_x < W, 1.0, 0.0) * (vr_x - W)**2
-        E_t = torch.where(vt_y > 0, 1.0, 0.0) * (vt_y)**2
-        E_b = torch.where(vb_y < H, 1.0, 0.0) * (vb_y - H)**2
+        E_l = torch.where(vl_x > 0, 1.0, 0.0) * (vl_x + W/2)**2
+        E_r = torch.where(vr_x < W, 1.0, 0.0) * (vr_x - W/2)**2
+        E_t = torch.where(vt_y > 0, 1.0, 0.0) * (vt_y + H/2)**2
+        E_b = torch.where(vb_y < H, 1.0, 0.0) * (vb_y - H/2)**2
 
         E_a = (E_l.mean() + E_r.mean() + E_t.mean() + E_b.mean()) / 4
 
         return E_a
+    
+    def boundary_conditions(self):
+        vl_x = self.mesh[ :, 0, 1]
+        vr_x = self.mesh[ :,-1, 1]
+        vt_y = self.mesh[ 0, :, 0]
+        vb_y = self.mesh[-1, :, 0]
+
+        pl_x = self.source_mesh[ :, 0, 1]
+        pr_x = self.source_mesh[ :,-1, 1]
+        pt_y = self.source_mesh[ 0, :, 0]
+        pb_y = self.source_mesh[-1, :, 0]
+
+        v_bounds = torch.cat([vl_x, vr_x, vt_y, vb_y])
+        p_bounds = torch.cat([pl_x, pr_x, pt_y, pb_y])
+
+        return ((v_bounds - p_bounds)**2).sum()
