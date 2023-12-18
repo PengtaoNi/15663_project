@@ -18,8 +18,8 @@ def get_face_bounds(image, debug=False):
         # extend the bounds to cover hair and chin
         x = max(x-w//2, 0)
         w = min(w*2, W-x)
-        y = max(y-h, 0)
-        h = min(int(h*2.1), H-y)
+        y = max(int(y-0.2*h), 0)
+        h = min(int(h*1.3), H-y)
 
         mask = np.zeros((H, W), dtype=np.uint8)
         mask[y:y+h, x:x+w] = 1

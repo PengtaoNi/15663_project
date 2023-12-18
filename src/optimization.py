@@ -92,10 +92,10 @@ class Optimesh(nn.Module):
         vt_y = orig_mesh[ 0, :, 0]
         vb_y = orig_mesh[-1, :, 0]
 
-        E_l = torch.where(vl_x > 0, 1.0, 0.0) * (vl_x + W/2)**2
-        E_r = torch.where(vr_x < W, 1.0, 0.0) * (vr_x - W/2)**2
-        E_t = torch.where(vt_y > 0, 1.0, 0.0) * (vt_y + H/2)**2
-        E_b = torch.where(vb_y < H, 1.0, 0.0) * (vb_y - H/2)**2
+        E_l = torch.where(vl_x > -W/2, 1.0, 0.0) * (vl_x + W/2)**2
+        E_r = torch.where(vr_x <  W/2, 1.0, 0.0) * (vr_x - W/2)**2
+        E_t = torch.where(vt_y > -H/2, 1.0, 0.0) * (vt_y + H/2)**2
+        E_b = torch.where(vb_y <  H/2, 1.0, 0.0) * (vb_y - H/2)**2
 
         E_a = (E_l.mean() + E_r.mean() + E_t.mean() + E_b.mean()) / 4
 
@@ -116,3 +116,27 @@ class Optimesh(nn.Module):
         p_bounds = torch.cat([pl_x, pr_x, pt_y, pb_y])
 
         return ((v_bounds - p_bounds)**2).sum()
+
+def optimize(source_mesh, stereographic_mesh, face_weights, correction_strength,
+             padding=4, lbd_f=4.0, lbd_b=2.0, lbd_r=0.5, lbd_a=4.0,
+             lr=1.0, max_iters=200):
+    model = Optimesh(source_mesh, stereographic_mesh, face_weights, correction_strength,
+                     padding, lbd_f, lbd_b, lbd_r, lbd_a)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    for iter in range(max_iters):
+        optimizer.zero_grad()
+        loss = model.forward()
+        loss.backward()
+        optimizer.step()
+        # print(loss.item())
+    
+    padding = model.padding
+    mesh = model.mesh.detach().numpy()[padding:-padding, padding:-padding, :]
+
+    # H, W = image.shape[:2]
+    # optimesh = cv2.resize(mesh, (W, H))
+    # y, x = optimesh[:,:,0] + (H-1)/2, optimesh[:,:,1] + (W-1)/2
+    # out = cv2.remap(image, x, y, cv2.INTER_LINEAR)
+
+    return mesh
