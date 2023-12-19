@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 
 import torch
 from torchvision import transforms
@@ -18,8 +19,8 @@ def get_face_bounds(image, debug=False):
         # extend the bounds to cover hair and chin
         x = max(x-w//2, 0)
         w = min(w*2, W-x)
-        y = max(int(y-0.2*h), 0)
-        h = min(int(h*1.3), H-y)
+        y = max(y-h, 0)
+        h = min(int(h*2.1), H-y)
 
         mask = np.zeros((H, W), dtype=np.uint8)
         mask[y:y+h, x:x+w] = 1
@@ -80,3 +81,29 @@ def get_face_masks(image, debug=False):
             plt.show()
 
     return out
+
+def get_face_weights(face_masks, dim=(103, 78), padding=4):
+    n_faces, H, W = face_masks.shape
+    if H < W:
+        dim = (dim[1], dim[0])
+    h, w = dim
+
+    face_weights = []
+    for k in range(n_faces):
+        face_weight = cv2.resize(face_masks[k], (w, h))
+        face_weights.append(np.pad(face_weight, padding))
+    face_weights = np.stack(face_weights, axis=0)
+
+    return face_weights
+
+def get_body_weight(image, dim=(103, 78), padding=4):
+    subject_mask = get_subject_mask(image)
+    H, W = subject_mask.shape
+    if H < W:
+        dim = (dim[1], dim[0])
+    h, w = dim
+
+    body_weight = cv2.resize(subject_mask, (w, h))
+    body_weight = np.pad(body_weight, padding)
+
+    return body_weight[None, :, :]

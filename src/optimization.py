@@ -4,7 +4,7 @@ import torch.nn as nn
 class Optimesh(nn.Module):
 
     def __init__(self, source_mesh, stereographic_mesh, face_weights, correction_strength, 
-                 padding=4, lbd_f=4.0, lbd_b=2.0, lbd_r=0.5, lbd_a=4.0):
+                 padding=4, lbd_f=4.0, lbd_b=2.0, lbd_r=0.5, lbd_a=4.0, lbd_bc=1e8):
         super(Optimesh, self).__init__()
 
         self.source_mesh = torch.tensor(source_mesh, dtype=torch.float32)
@@ -14,7 +14,8 @@ class Optimesh(nn.Module):
         self.correction_strength = torch.tensor(correction_strength, dtype=torch.float32)
 
         self.padding = padding
-        self.lbd_f, self.lbd_b, self.lbd_r, self.lbd_a = lbd_f, lbd_b, lbd_r, lbd_a
+        self.lbd_f, self.lbd_b, self.lbd_r, self.lbd_a, self.lbd_bc = \
+             lbd_f, lbd_b, lbd_r, lbd_a, lbd_bc
 
         # trainable parameters
         self.mesh = torch.tensor(source_mesh, dtype=torch.float32)
@@ -26,13 +27,13 @@ class Optimesh(nn.Module):
         E_f = self.face_objective_term()
         E_b, E_r = self.line_bending_and_regularization_term()
         E_a = self.asymmetric_cost_term()
-        penalty = 1e8 * self.boundary_conditions()
+        E_bc = self.boundary_conditions()
 
         energy = self.lbd_f * E_f + \
                  self.lbd_b * E_b + \
                  self.lbd_r * E_r + \
                  self.lbd_a * E_a + \
-                 penalty
+                 self.lbd_bc * E_bc
 
         return energy
 
@@ -118,10 +119,10 @@ class Optimesh(nn.Module):
         return ((v_bounds - p_bounds)**2).sum()
 
 def optimize(source_mesh, stereographic_mesh, face_weights, correction_strength,
-             padding=4, lbd_f=4.0, lbd_b=2.0, lbd_r=0.5, lbd_a=4.0,
+             padding=4, lbd_f=4.0, lbd_b=2.0, lbd_r=0.5, lbd_a=4.0, lbd_bc=1e8,
              lr=1.0, max_iters=200):
     model = Optimesh(source_mesh, stereographic_mesh, face_weights, correction_strength,
-                     padding, lbd_f, lbd_b, lbd_r, lbd_a)
+                     padding, lbd_f, lbd_b, lbd_r, lbd_a, lbd_bc)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     for iter in range(max_iters):
